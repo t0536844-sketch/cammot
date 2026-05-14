@@ -1,0 +1,7 @@
+run = "npm start"
+
+[deployment]
+run = ["npm", "start"]
+
+[deployment.target]
+target = "linux/amd64"
