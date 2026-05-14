@@ -1,118 +1,445 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Remote Kamera via Browser (v2 dengan Rekam & Fitur Lain)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#0a0a0f"/>
+  <title>CAMMOT — Camera Remote Control</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background: #111;
-      color: #eee;
-      text-align: center;
+    /* ==================== RESET & BASE ==================== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: rgba(255,255,255,0.04);
+      --surface-hover: rgba(255,255,255,0.08);
+      --border: rgba(255,255,255,0.08);
+      --text: #e8e8ed;
+      --text-dim: #888;
+      --accent: #6c5ce7;
+      --accent-hover: #7c6cf7;
+      --green: #00b894;
+      --red: #e17055;
+      --yellow: #fdcb6e;
+      --blue: #74b9ff;
+      --radius: 12px;
+      --radius-sm: 8px;
     }
-    video {
-      width: 100%;
-      max-width: 800px;
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding: 16px;
+      line-height: 1.5;
+    }
+
+    /* ==================== HEADER ==================== */
+    .header {
+      text-align: center;
+      padding: 20px 0 16px;
+    }
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent), var(--blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header p {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* ==================== SERVER URL BAR ==================== */
+    .url-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin: 12px auto;
+      max-width: 500px;
+      word-break: break-all;
+    }
+    .url-bar span { color: var(--green); font-weight: 600; }
+
+    /* ==================== CONNECTION STATUS ==================== */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px;
+      margin: 12px auto;
+      max-width: 500px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .status-dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .status-dot.offline { background: var(--red); box-shadow: 0 0 8px var(--red); }
+    .status-dot.connecting { background: var(--yellow); animation: pulse 1s infinite; }
+    .status-text { font-size: 0.85rem; color: var(--text-dim); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ==================== ROLE SELECTOR ==================== */
+    .role-selector {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 16px auto;
+      max-width: 500px;
+    }
+    .role-btn {
+      flex: 1;
+      padding: 14px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .role-btn:hover { background: var(--surface-hover); }
+    .role-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .role-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .role-btn .emoji { font-size: 1.2rem; display: block; margin-bottom: 4px; }
+
+    /* ==================== VIDEO CONTAINER ==================== */
+    .video-wrapper {
+      position: relative;
       background: #000;
-      border: 2px solid #444;
-      margin: 10px auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 16px auto;
+      max-width: 600px;
+      aspect-ratio: 4/3;
+      display: none;
+    }
+    .video-wrapper.active { display: block; }
+    .video-wrapper video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
       display: block;
     }
-    .container {
-      max-width: 900px;
-      margin: auto;
+    .video-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
     }
-    button {
-      padding: 12px 24px;
-      margin: 10px 5px;
-      font-size: 1.1rem;
+    .video-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+    .video-placeholder .icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+    /* ==================== CONTROLS PANEL ==================== */
+    .controls-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin: 16px auto;
+      max-width: 600px;
+      display: none;
+    }
+    .controls-panel.active { display: block; }
+    .controls-panel h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    .ctrl-btn {
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
       cursor: pointer;
-      border: none;
-      border-radius: 5px;
-      background: #333;
-      color: #eee;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
     }
-    button:hover { background: #555; }
-    button:disabled { background: #222; cursor: not-allowed; }
-    #status {
-      margin: 15px 0;
-      font-size: 1.1rem;
-      color: #0f0;
-      min-height: 1.5em;
+    .ctrl-btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+    .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .ctrl-btn.danger { border-color: var(--red); color: var(--red); }
+    .ctrl-btn.danger:hover { background: rgba(225,112,85,0.15); }
+    .ctrl-btn.success { border-color: var(--green); color: var(--green); }
+    .ctrl-btn .emoji { font-size: 1rem; }
+
+    /* ==================== RECORDING INDICATOR ==================== */
+    .recording-indicator {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      margin-top: 10px;
+      background: rgba(225,112,85,0.1);
+      border: 1px solid rgba(225,112,85,0.3);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: var(--red);
     }
-    #error {
-      color: #f55;
+    .recording-indicator.active { display: flex; }
+    .rec-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      animation: pulse 1s infinite;
     }
-    #recordTime { color: #ff0; font-size: 1.2rem; display: none; }
-    #downloadLink { margin: 10px; display: none; color: #0ff; }
-    #broadcasterControls, #viewerControls { margin: 20px 0; display: none; }
+
+    /* ==================== DOWNLOAD LINK ==================== */
+    .download-link {
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(116,185,255,0.1);
+      border: 1px solid rgba(116,185,255,0.3);
+      border-radius: var(--radius-sm);
+      color: var(--blue);
+      text-align: center;
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+    .download-link.active { display: block; }
+    .download-link:hover { background: rgba(116,185,255,0.2); }
+
+    /* ==================== TOAST NOTIFICATIONS ==================== */
+    .toast-container {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      background: rgba(20,20,30,0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      color: var(--text);
+      max-width: 320px;
+      text-align: center;
+      animation: toastIn 0.3s ease, toastOut 0.3s ease 3s forwards;
+      pointer-events: auto;
+    }
+    .toast.error { border-color: var(--red); color: var(--red); }
+    .toast.success { border-color: var(--green); color: var(--green); }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; }
+      to { opacity: 0; transform: translateY(-10px); }
+    }
+
+    /* ==================== RECONNECT BANNER ==================== */
+    .reconnect-banner {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px;
+      margin: 12px auto;
+      max-width: 500px;
+      background: rgba(253,203,110,0.1);
+      border: 1px solid rgba(253,203,110,0.3);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: var(--yellow);
+    }
+    .reconnect-banner.active { display: flex; }
+    .reconnect-banner button {
+      padding: 4px 12px;
+      border: 1px solid var(--yellow);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--yellow);
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    /* ==================== FOOTER ==================== */
+    .footer {
+      text-align: center;
+      padding: 20px 0 8px;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    /* ==================== RESPONSIVE ==================== */
+    @media (max-width: 400px) {
+      .btn-grid { grid-template-columns: 1fr 1fr; }
+      .role-btn { padding: 12px 10px; font-size: 0.85rem; }
+    }
   </style>
 </head>
 <body>
-<div class="container">
-  <h2>Remote Kamera Sederhana (WebRTC) - Dengan Rekam & Fitur Lain</h2>
-  
-  <div>
-    <button id="btnStart">Mulai Broadcast Kamera (Perangkat A)</button>
-    <button id="btnView">Lihat Kamera Remote (Perangkat B)</button>
-  </div>
 
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Header -->
+<div class="header">
+  <h1>📸 CAMMOT</h1>
+  <p>Camera Remote Control via WebRTC</p>
+</div>
+
+<!-- Server URL -->
+<div class="url-bar">🌐 Server: <span id="serverUrl">...</span></div>
+
+<!-- Connection Status -->
+<div class="status-bar">
+  <div class="status-dot" id="statusDot"></div>
+  <div class="status-text" id="statusText">Menunggu...</div>
+</div>
+
+<!-- Reconnect Banner -->
+<div class="reconnect-banner" id="reconnectBanner">
+  ⚠️ Broadcaster terputus — mencoba ulang...
+  <button id="btnReconnectNow" onclick="reconnectNow()">Hubungkan</button>
+</div>
+
+<!-- Role Selector -->
+<div class="role-selector">
+  <button class="role-btn" id="btnStart" onclick="startBroadcast()">
+    <span class="emoji">📷</span>
+    Broadcast
+  </button>
+  <button class="role-btn" id="btnView" onclick="startViewing()">
+    <span class="emoji">👁️</span>
+    Lihat
+  </button>
+</div>
+
+<!-- Local Video (Broadcaster) -->
+<div class="video-wrapper" id="localVideoWrapper">
   <video id="localVideo" autoplay playsinline muted></video>
+  <div class="video-label">📷 KAMU</div>
+  <div class="video-placeholder" id="localPlaceholder">
+    <span class="icon">📷</span>
+    <span>Menunggu kamera...</span>
+  </div>
+</div>
+
+<!-- Remote Video (Viewer) -->
+<div class="video-wrapper" id="remoteVideoWrapper">
   <video id="remoteVideo" autoplay playsinline></video>
-  
-  <div id="broadcasterControls">
-    <h3>Kontrol Broadcaster</h3>
-    <button id="btnSwitchCamera">Ganti Kamera (Depan/Belakang)</button>
-    <button id="btnToggleTorch">Nyalakan/Matikan Flashlight</button>
-    <button id="btnSnapPhoto">Ambil Foto</button>
-    <button id="btnToggleAudio">Aktifkan/Matikan Audio</button>
-    <button id="btnFullScreenLocal">Full Screen</button>
+  <div class="video-label">👁️ REMOTE</div>
+  <div class="video-placeholder" id="remotePlaceholder">
+    <span class="icon">📡</span>
+    <span>Menunggu stream...</span>
   </div>
-  
-  <div id="viewerControls">
-    <h3>Kontrol Viewer</h3>
-    <button id="btnRecord">Mulai Rekam</button>
-    <button id="btnStopRecord" disabled>Stop Rekam</button>
-    <button id="btnSnapPhotoViewer">Ambil Foto</button>
-    <button id="btnFullScreenRemote">Full Screen</button>
-    <div id="recordTime">Waktu rekam: 00:00</div>
-    <a id="downloadLink" download="rekaman.webm">Download Rekaman</a>
+</div>
+
+<!-- Broadcaster Controls -->
+<div class="controls-panel" id="broadcasterControls">
+  <h3>🎛️ Kontrol Broadcaster</h3>
+  <div class="btn-grid">
+    <button class="ctrl-btn" onclick="switchCamera()"><span class="emoji">🔄</span> Ganti Kamera</button>
+    <button class="ctrl-btn" onclick="toggleTorch()"><span class="emoji">🔦</span> Flashlight</button>
+    <button class="ctrl-btn" onclick="snapPhoto('local')"><span class="emoji">📸</span> Foto</button>
+    <button class="ctrl-btn" onclick="toggleAudio()"><span class="emoji">🔊</span> Audio</button>
+    <button class="ctrl-btn" onclick="goFullscreen('local')"><span class="emoji">🖥️</span> Fullscreen</button>
+    <button class="ctrl-btn danger" onclick="stopBroadcast()"><span class="emoji">⏹️</span> Berhenti</button>
   </div>
-  
-  <div id="status">Status: Siap</div>
-  <div id="error"></div>
+</div>
+
+<!-- Viewer Controls -->
+<div class="controls-panel" id="viewerControls">
+  <h3>🎛️ Kontrol Viewer</h3>
+  <div class="btn-grid">
+    <button class="ctrl-btn success" id="btnRecord" onclick="startRecording()"><span class="emoji">⏺️</span> Rekam</button>
+    <button class="ctrl-btn danger" id="btnStopRecord" onclick="stopRecording()" disabled><span class="emoji">⏹️</span> Stop</button>
+    <button class="ctrl-btn" onclick="snapPhoto('remote')"><span class="emoji">📸</span> Foto</button>
+    <button class="ctrl-btn" onclick="goFullscreen('remote')"><span class="emoji">🖥️</span> Fullscreen</button>
+  </div>
+  <div class="recording-indicator" id="recordingIndicator">
+    <div class="rec-dot"></div>
+    <span>Merekam: <strong id="recordTimeDisplay">00:00</strong></span>
+  </div>
+  <a class="download-link" id="downloadLink" download="rekaman.webm">⬇️ Download Rekaman</a>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  CAMMOT v1.0 — WebRTC P2P Camera Remote
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-// ==================== KONFIGURASI ====================
+// ==================== CONFIG ====================
 const socket = io();
-let localStream = null;
-let peerConnection = null;
-let isBroadcaster = false;
-let facingMode = 'environment'; // default belakang
-let audioEnabled = false; // default mati
-let torchEnabled = false;
-let mediaRecorder = null;
-let recordedChunks = [];
-let recordTimer = null;
-let recordStartTime = null;
 
-const config = { 
+const rtcConfig = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
-    { 
+    {
       urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject",
       credential: "openrelayproject"
     },
-    { 
+    {
       urls: "turn:openrelay.metered.ca:443",
       username: "openrelayproject",
       credential: "openrelayproject"
@@ -120,84 +447,144 @@ const config = {
   ]
 };
 
-// Elements
-const localVideo = document.getElementById('localVideo');
-const remoteVideo = document.getElementById('remoteVideo');
-const statusEl = document.getElementById('status');
-const errorEl = document.getElementById('error');
-const broadcasterControls = document.getElementById('broadcasterControls');
-const viewerControls = document.getElementById('viewerControls');
-const btnSwitchCamera = document.getElementById('btnSwitchCamera');
-const btnToggleTorch = document.getElementById('btnToggleTorch');
-const btnSnapPhoto = document.getElementById('btnSnapPhoto');
-const btnToggleAudio = document.getElementById('btnToggleAudio');
-const btnFullScreenLocal = document.getElementById('btnFullScreenLocal');
-const btnRecord = document.getElementById('btnRecord');
-const btnStopRecord = document.getElementById('btnStopRecord');
-const btnSnapPhotoViewer = document.getElementById('btnSnapPhotoViewer');
-const btnFullScreenRemote = document.getElementById('btnFullScreenRemote');
-const recordTimeEl = document.getElementById('recordTime');
-const downloadLink = document.getElementById('downloadLink');
+// ==================== STATE ====================
+let localStream = null;
+let peerConnection = null;
+let isBroadcaster = false;
+let facingMode = 'environment';
+let audioEnabled = false;
+let torchEnabled = false;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordTimer = null;
+let recordStartTime = null;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
-function setStatus(msg) {
-  statusEl.textContent = msg;
-  console.log("[STATUS]", msg);
+// ==================== DOM REFS ====================
+const $ = id => document.getElementById(id);
+const localVideo = $('localVideo');
+const remoteVideo = $('remoteVideo');
+const localVideoWrapper = $('localVideoWrapper');
+const remoteVideoWrapper = $('remoteVideoWrapper');
+const localPlaceholder = $('localPlaceholder');
+const remotePlaceholder = $('remotePlaceholder');
+const broadcasterControls = $('broadcasterControls');
+const viewerControls = $('viewerControls');
+const btnStart = $('btnStart');
+const btnView = $('btnView');
+const btnRecord = $('btnRecord');
+const btnStopRecord = $('btnStopRecord');
+const recordingIndicator = $('recordingIndicator');
+const recordTimeDisplay = $('recordTimeDisplay');
+const downloadLink = $('downloadLink');
+const statusDot = $('statusDot');
+const statusText = $('statusText');
+const reconnectBanner = $('reconnectBanner');
+const serverUrl = $('serverUrl');
+const toastContainer = $('toastContainer');
+
+// ==================== INIT ====================
+function init() {
+  const proto = location.protocol === 'https:' ? 'https' : 'http';
+  serverUrl.textContent = `${proto}://${location.host}`;
+  setStatus('waiting', 'Siap — pilih mode untuk mulai');
 }
 
-function setError(msg) {
-  errorEl.textContent = msg;
-  console.error("[ERROR]", msg);
+// ==================== TOAST ====================
+function showToast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  toastContainer.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
 }
 
-// ==================== UPDATE STREAM ====================
-async function updateStream() {
+// ==================== STATUS ====================
+function setStatus(state, msg) {
+  statusDot.className = 'status-dot';
+  if (state === 'online') { statusDot.classList.add('online'); }
+  else if (state === 'offline') { statusDot.classList.add('offline'); }
+  else if (state === 'connecting') { statusDot.classList.add('connecting'); }
+  statusText.textContent = msg;
+}
+
+// ==================== BROADCASTER ====================
+async function startBroadcast() {
+  if (localStream) { showToast('Kamera sudah aktif', 'error'); return; }
+  if (isBroadcaster) { showToast('Sudah dalam mode broadcast', 'error'); return; }
+
+  setStatus('connecting', 'Membuka kamera...');
   try {
-    // Stop tracks lama jika ada (agar tidak leak resource)
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
-
-    setStatus('Membuat stream baru...');
     localStream = await navigator.mediaDevices.getUserMedia({
-      video: { 
-        facingMode: facingMode
-      },
+      video: { facingMode },
       audio: audioEnabled
     });
-    
     localVideo.srcObject = localStream;
-    setStatus('Stream lokal diperbarui');
+    localVideoWrapper.classList.add('active');
+    localPlaceholder.style.display = 'none';
+    broadcasterControls.classList.add('active');
+    btnStart.classList.add('active');
+    btnView.disabled = true;
+    isBroadcaster = true;
+    socket.emit('register', 'broadcaster');
+    setStatus('online', 'Broadcasting...');
+    showToast('✅ Kamera aktif — broadcast dimulai', 'success');
+  } catch (err) {
+    setStatus('offline', 'Gagal akses kamera');
+    showToast(`❌ ${err.message}`, 'error');
+  }
+}
 
-    // Update torch setelah stream baru (jika torchEnabled dan support)
+async function stopBroadcast() {
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  localVideo.srcObject = null;
+  localVideoWrapper.classList.remove('active');
+  localPlaceholder.style.display = '';
+  broadcasterControls.classList.remove('active');
+  btnStart.classList.remove('active');
+  btnView.disabled = false;
+  isBroadcaster = false;
+  setStatus('offline', 'Broadcast dihentikan');
+  showToast('⏹️ Broadcast dihentikan');
+}
+
+async function updateStream() {
+  try {
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+    }
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode },
+      audio: audioEnabled
+    });
+    localVideo.srcObject = localStream;
+
     if (torchEnabled) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack && videoTrack.getCapabilities?.().torch) {
-        await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
+      const track = localStream.getVideoTracks()[0];
+      if (track?.getCapabilities?.().torch) {
+        await track.applyConstraints({ advanced: [{ torch: true }] });
       }
     }
 
-    // Update peerConnection jika sudah ada
     if (peerConnection && localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
-      if (!videoTrack) {
-        setError('Tidak ada video track di stream baru');
-        return;
+      if (videoTrack) {
+        let sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(videoTrack);
+        } else {
+          peerConnection.addTrack(videoTrack, localStream);
+        }
       }
-
-      // Cari sender video yang ada
-      let sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
-
-      if (sender) {
-        // Sender ada → replace
-        console.log('Replace existing video track');
-        await sender.replaceTrack(videoTrack);
-      } else {
-        // Tidak ada sender → tambah baru (biasanya broadcaster side)
-        console.log('Add new video track (no existing sender)');
-        peerConnection.addTrack(videoTrack, localStream);
-      }
-
-      // Jika ada audio dan audioEnabled
       if (audioEnabled) {
         const audioTrack = localStream.getAudioTracks()[0];
         if (audioTrack) {
@@ -210,203 +597,237 @@ async function updateStream() {
         }
       }
     }
-
+    setStatus('online', 'Stream diperbarui');
   } catch (err) {
-    setError('Gagal update stream: ' + err.message);
-    console.error(err);
+    showToast(`Gagal update stream: ${err.message}`, 'error');
   }
 }
 
-// ==================== TOGGLE TORCH ====================
+async function switchCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  await updateStream();
+  showToast(`🔄 Kamera: ${facingMode === 'environment' ? 'Belakang' : 'Depan'}`);
+}
+
 async function toggleTorch() {
   if (!localStream) return;
-  const videoTrack = localStream.getVideoTracks()[0];
-  if (!videoTrack.getCapabilities || !videoTrack.getCapabilities().torch) {
-    setError('Torch tidak support di device ini');
+  const track = localStream.getVideoTracks()[0];
+  if (!track?.getCapabilities?.().torch) {
+    showToast('Torch tidak didukung di perangkat ini', 'error');
     return;
   }
   torchEnabled = !torchEnabled;
-  await videoTrack.applyConstraints({ advanced: [{ torch: torchEnabled }] });
-  btnToggleTorch.textContent = torchEnabled ? 'Matikan Flashlight' : 'Nyalakan Flashlight';
+  await track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
+  showToast(torchEnabled ? '🔦 Flashlight ON' : '🔦 Flashlight OFF');
 }
 
-// ==================== SNAP PHOTO ====================
-function snapPhoto(videoEl) {
-  const canvas = document.createElement('canvas');
-  canvas.width = videoEl.videoWidth;
-  canvas.height = videoEl.videoHeight;
-  canvas.getContext('2d').drawImage(videoEl, 0, 0);
-  const dataURL = canvas.toDataURL('image/png');
-  const link = document.createElement('a');
-  link.href = dataURL;
-  link.download = 'snapshot.png';
-  link.click();
+async function toggleAudio() {
+  audioEnabled = !audioEnabled;
+  await updateStream();
+  showToast(audioEnabled ? '🔊 Audio ON' : '🔇 Audio OFF');
 }
 
-// ==================== RECORDING ====================
-function startRecording() {
-  if (!remoteVideo.srcObject) {
-    setError('Tidak ada stream remote untuk direkam');
-    return;
-  }
-  recordedChunks = [];
-  mediaRecorder = new MediaRecorder(remoteVideo.srcObject, { mimeType: 'video/webm' });
-  
-  mediaRecorder.ondataavailable = e => {
-    if (e.data.size > 0) recordedChunks.push(e.data);
-  };
-  
-  mediaRecorder.onstop = () => {
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    downloadLink.href = URL.createObjectURL(blob);
-    downloadLink.download = 'rekaman.webm';
-    downloadLink.style.display = 'block';
-    setStatus('Rekaman selesai. Download siap!');
-  };
-  
-  mediaRecorder.start();
-  btnRecord.disabled = true;
-  btnStopRecord.disabled = false;
-  recordTimeEl.style.display = 'block';
-  recordStartTime = Date.now();
-  updateRecordTime();
-  setStatus('Sedang merekam...');
-}
+// ==================== VIEWER ====================
+async function startViewing() {
+  if (peerConnection) { showToast('Sudah terhubung', 'error'); return; }
 
-function stopRecording() {
-  if (mediaRecorder) {
-    mediaRecorder.stop();
-    clearInterval(recordTimer);
-    btnRecord.disabled = false;
-    btnStopRecord.disabled = true;
-    recordTimeEl.textContent = 'Waktu rekam: 00:00';
-    recordTimeEl.style.display = 'none';
+  setStatus('connecting', 'Menghubungkan ke broadcaster...');
+  btnView.classList.add('active');
+  btnStart.disabled = true;
+  reconnectAttempts = 0;
+
+  createPeerConnection();
+
+  try {
+    const pc = peerConnection;
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    if (audioEnabled) pc.addTransceiver('audio', { direction: 'recvonly' });
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit('offer', { sdp: pc.localDescription });
+    showToast('📡 Menghubungkan...');
+  } catch (err) {
+    setStatus('offline', 'Gagal membuat koneksi');
+    showToast(`❌ ${err.message}`, 'error');
+    cleanupViewer();
   }
 }
 
-function updateRecordTime() {
-  recordTimer = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
-    const min = String(Math.floor(elapsed / 60)).padStart(2, '0');
-    const sec = String(elapsed % 60).padStart(2, '0');
-    recordTimeEl.textContent = `Waktu rekam: \( {min}: \){sec}`;
-  }, 1000);
-}
-
-// ==================== FULL SCREEN ====================
-function requestFullScreen(videoEl) {
-  if (videoEl.requestFullscreen) videoEl.requestFullscreen();
-  else if (videoEl.webkitRequestFullscreen) videoEl.webkitRequestFullscreen();
-  else if (videoEl.msRequestFullscreen) videoEl.msRequestFullscreen();
-}
-
-// ==================== BUAT PEER CONNECTION ====================
 function createPeerConnection() {
-  const pc = new RTCPeerConnection(config);
+  const pc = new RTCPeerConnection(rtcConfig);
 
   pc.onicecandidate = (e) => {
-    if (e.candidate) {
-      socket.emit('candidate', { candidate: e.candidate });
-    }
+    if (e.candidate) socket.emit('candidate', { candidate: e.candidate });
   };
 
   pc.oniceconnectionstatechange = () => {
     const state = pc.iceConnectionState;
-    console.log('ICE Connection state:', state);
-    setStatus(`Status: ${state}`);
-    
     if (state === 'connected' || state === 'completed') {
-      setStatus('Koneksi WebRTC berhasil!');
+      setStatus('online', 'Terhubung!');
+      showToast('✅ WebRTC terhubung', 'success');
     } else if (state === 'failed' || state === 'disconnected') {
-      setError('Koneksi gagal. Coba restart atau tambah TURN server.');
+      setStatus('offline', 'Koneksi terputus');
+      showToast('⚠️ Koneksi WebRTC gagal', 'error');
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    const state = pc.connectionState;
+    if (state === 'failed') {
+      setStatus('offline', 'Koneksi gagal');
+      showToast('❌ Koneksi WebRTC gagal — coba lagi', 'error');
+      cleanupViewer();
     }
   };
 
   pc.ontrack = (e) => {
-    console.log('ontrack fired! Remote stream diterima', e.streams[0]);
     const remoteStream = e.streams[0];
-    remoteVideo.srcObject = null; // force refresh
     remoteVideo.srcObject = remoteStream;
-    
-    // Force unmute tracks
-    remoteStream.getTracks().forEach(track => {
-      track.enabled = true;
-      track.muted = false;
-    });
-    
-    setStatus('Sedang menampilkan kamera remote!');
-    viewerControls.style.display = 'block';
+    remoteVideoWrapper.classList.add('active');
+    remotePlaceholder.style.display = 'none';
+    viewerControls.classList.add('active');
+    setStatus('online', 'Menampilkan kamera remote');
+    showToast('✅ Stream remote aktif', 'success');
   };
 
-  pc.onconnectionstatechange = () => {
-    console.log('Connection state:', pc.connectionState);
-  };
-
-  return pc;
+  peerConnection = pc;
 }
 
-// ==================== MODE BROADCASTER ====================
-document.getElementById('btnStart').onclick = async () => {
-  if (localStream) return setStatus('Kamera sudah aktif');
-
-  await updateStream();
-  broadcasterControls.style.display = 'block';
-  isBroadcaster = true;
-  socket.emit('register', 'broadcaster');
-};
-
-// ==================== EVENT BROADCASTER ====================
-btnSwitchCamera.onclick = async () => {
-  facingMode = facingMode === 'environment' ? 'user' : 'environment';
-  await updateStream();
-};
-
-btnToggleTorch.onclick = toggleTorch;
-
-btnSnapPhoto.onclick = () => snapPhoto(localVideo);
-
-btnToggleAudio.onclick = async () => {
-  audioEnabled = !audioEnabled;
-  btnToggleAudio.textContent = audioEnabled ? 'Matikan Audio' : 'Aktifkan Audio';
-  await updateStream();
-};
-
-btnFullScreenLocal.onclick = () => requestFullScreen(localVideo);
-
-// ==================== MODE VIEWER ====================
-document.getElementById('btnView').onclick = async () => {
-  if (peerConnection) return setStatus('Sudah / sedang connect');
-
-  setStatus('Viewer: Membuat koneksi...');
-  peerConnection = createPeerConnection();
-
-  // Tambahkan transceiver untuk receive video (dan audio jika perlu)
-  peerConnection.addTransceiver('video', { direction: 'recvonly' });
-  if (audioEnabled) peerConnection.addTransceiver('audio', { direction: 'recvonly' });
-
-  try {
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-    socket.emit('offer', { sdp: peerConnection.localDescription });
-  } catch (err) {
-    setError('Gagal membuat offer: ' + err.message);
+function cleanupViewer() {
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
   }
-};
+  remoteVideo.srcObject = null;
+  remoteVideoWrapper.classList.remove('active');
+  remotePlaceholder.style.display = '';
+  viewerControls.classList.remove('active');
+  btnView.classList.remove('active');
+  btnStart.disabled = false;
+}
 
-// ==================== EVENT VIEWER ====================
-btnRecord.onclick = startRecording;
-btnStopRecord.onclick = stopRecording;
-btnSnapPhotoViewer.onclick = () => snapPhoto(remoteVideo);
-btnFullScreenRemote.onclick = () => requestFullScreen(remoteVideo);
+// ==================== AUTO-RECONNECT ====================
+function triggerAutoReconnect() {
+  if (reconnectTimer) return;
+  reconnectAttempts = 0;
+  reconnectBanner.classList.add('active');
+  setStatus('connecting', 'Mencoba terhubung ulang...');
+  attemptReconnect();
+}
 
-// ==================== SIGNALING HANDLER ====================
+function attemptReconnect() {
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    reconnectBanner.classList.remove('active');
+    reconnectTimer = null;
+    setStatus('offline', 'Gagal terhubung ulang');
+    showToast('⚠️ Gagal terhubung setelah beberapa percobaan', 'error');
+    cleanupViewer();
+    return;
+  }
+
+  reconnectAttempts++;
+  setStatus('connecting', `Reconnect percobaan ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`);
+  cleanupViewer();
+
+  setTimeout(() => {
+    createPeerConnection();
+    const pc = peerConnection;
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    pc.createOffer()
+      .then(offer => pc.setLocalDescription(offer))
+      .then(() => socket.emit('offer', { sdp: pc.localDescription }))
+      .catch(() => attemptReconnect());
+  }, 2000 * reconnectAttempts);
+}
+
+function reconnectNow() {
+  reconnectBanner.classList.remove('active');
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  reconnectAttempts = 0;
+  attemptReconnect();
+}
+
+// ==================== PHOTO ====================
+function snapPhoto(source) {
+  const video = source === 'local' ? localVideo : remoteVideo;
+  if (!video.srcObject) { showToast('Tidak ada stream untuk difoto', 'error'); return; }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cammot_${Date.now()}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📸 Foto disimpan', 'success');
+  }, 'image/png');
+}
+
+// ==================== RECORDING ====================
+function startRecording() {
+  if (!remoteVideo.srcObject) { showToast('Tidak ada stream untuk direkam', 'error'); return; }
+
+  recordedChunks = [];
+  mediaRecorder = new MediaRecorder(remoteVideo.srcObject, { mimeType: 'video/webm' });
+
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.classList.add('active');
+    showToast('✅ Rekaman selesai!', 'success');
+  };
+
+  mediaRecorder.start();
+  btnRecord.disabled = true;
+  btnStopRecord.disabled = false;
+  recordingIndicator.classList.add('active');
+  downloadLink.classList.remove('active');
+  recordStartTime = Date.now();
+  recordTimer = setInterval(updateRecordTime, 1000);
+  showToast('⏺️ Rekaman dimulai');
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  clearInterval(recordTimer);
+  btnRecord.disabled = false;
+  btnStopRecord.disabled = true;
+  recordingIndicator.classList.remove('active');
+  recordTimeDisplay.textContent = '00:00';
+}
+
+function updateRecordTime() {
+  const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+  const min = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const sec = String(elapsed % 60).padStart(2, '0');
+  recordTimeDisplay.textContent = `${min}:${sec}`;
+}
+
+// ==================== FULLSCREEN ====================
+function goFullscreen(source) {
+  const video = source === 'local' ? localVideo : remoteVideo;
+  if (video.requestFullscreen) video.requestFullscreen();
+  else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+  else if (video.msRequestFullscreen) video.msRequestFullscreen();
+}
+
+// ==================== SOCKET EVENTS ====================
 socket.on('registered', (role) => {
-  setStatus(`Terdaftar sebagai ${role}`);
+  showToast(`✅ Terdaftar sebagai ${role}`, 'success');
 });
 
 socket.on('broadcaster-ready', () => {
   if (!isBroadcaster) {
-    setStatus('Broadcaster terdeteksi! Klik "Lihat Kamera Remote" untuk connect.');
+    setStatus('online', 'Broadcaster siap — klik "Lihat" untuk connect');
   }
 });
 
@@ -414,20 +835,13 @@ socket.on('offer', async (data) => {
   if (!isBroadcaster) return;
 
   if (!peerConnection) {
-    peerConnection = createPeerConnection();
+    createPeerConnection();
   }
 
-  // Pastikan tracks ditambahkan SEBELUM setRemoteDescription
   if (localStream) {
     localStream.getTracks().forEach(track => {
-      // Cek apakah sender sudah ada untuk kind ini
-      const existingSender = peerConnection.getSenders().find(s => s.track?.kind === track.kind);
-      if (!existingSender) {
-        console.log('Menambahkan track baru ke PC:', track.kind);
-        peerConnection.addTrack(track, localStream);
-      } else {
-        console.log('Sender sudah ada untuk', track.kind);
-      }
+      const existing = peerConnection.getSenders().find(s => s.track?.kind === track.kind);
+      if (!existing) peerConnection.addTrack(track, localStream);
     });
   }
 
@@ -436,22 +850,18 @@ socket.on('offer', async (data) => {
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     socket.emit('answer', { sdp: peerConnection.localDescription });
-    setStatus('Offer diterima, mengirim answer...');
   } catch (err) {
-    setError('Gagal handle offer: ' + err.message);
+    showToast(`Gagal handle offer: ${err.message}`, 'error');
   }
 });
 
 socket.on('answer', async (data) => {
-  if (isBroadcaster) return;
-
-  if (!peerConnection) return;
-
+  if (isBroadcaster || !peerConnection) return;
   try {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    setStatus('Answer diterima, menunggu ICE...');
+    setStatus('connecting', 'Answer diterima, menghubungkan...');
   } catch (err) {
-    setError('Gagal set answer: ' + err.message);
+    showToast(`Gagal set answer: ${err.message}`, 'error');
   }
 });
 
@@ -460,23 +870,23 @@ socket.on('candidate', async (data) => {
   try {
     await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
   } catch (err) {
-    console.warn('Gagal tambah candidate:', err);
+    console.warn('Candidate error:', err);
   }
 });
 
 socket.on('broadcaster-disconnected', () => {
-  setError('Broadcaster terputus. Silakan mulai ulang broadcast.');
-  if (remoteVideo.srcObject) {
-    remoteVideo.srcObject = null;
-  }
+  showToast('⚠️ Broadcaster terputus', 'error');
+  setStatus('offline', 'Broadcaster terputus');
+  cleanupViewer();
+  triggerAutoReconnect();
 });
 
 socket.on('error', (msg) => {
-  setError('Server: ' + msg);
+  showToast(`Server: ${msg}`, 'error');
 });
 
-// Debug awal
-console.log("Halaman dimuat. Buka console (F12) untuk debug detail.");
+// ==================== START ====================
+init();
 </script>
 </body>
 </html>
